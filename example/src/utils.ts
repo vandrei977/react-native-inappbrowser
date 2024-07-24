@@ -6,7 +6,7 @@ import {
   StatusBarStyle,
   Dimensions,
 } from 'react-native';
-import {InAppBrowser} from 'react-native-inappbrowser-reborn';
+import {InAppBrowser} from '@vandrei977/react-native-inappbrowser-reborn';
 
 const sleep = (timeout: number) =>
   new Promise<void>(resolve => setTimeout(resolve, timeout));

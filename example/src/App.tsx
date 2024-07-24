@@ -17,7 +17,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {openLink, tryDeepLinking} from './utils';
-import {InAppBrowser} from 'react-native-inappbrowser-reborn';
+import {InAppBrowser} from '@vandrei977/react-native-inappbrowser-reborn';
 import {Colors} from 'react-native/Libraries/NewAppScreen';
 
 const instructions = Platform.select({

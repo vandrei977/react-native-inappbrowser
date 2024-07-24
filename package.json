@@ -1,6 +1,6 @@
 {
-  "name": "react-native-inappbrowser-reborn",
-  "version": "3.7.0",
+  "name": "@vandrei977/react-native-inappbrowser-reborn",
+  "version": "3.7.22",
   "description": "InAppBrowser for React Native",
   "main": "index.js",
   "scripts": {
@@ -11,10 +11,7 @@
   "typings": "./index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git@github.com:proyecto26/react-native-inappbrowser.git"
-  },
-  "bugs": {
-    "url": "https://github.com/proyecto26/react-native-inappbrowser/issues"
+    "url": "git@github.com:vandrei977/react-native-inappbrowser.git"
   },
   "keywords": [
     "react-native",
@@ -36,7 +33,7 @@
     "ChromeTabsManagerActivity"
   ],
   "author": "Juan David Nicholls Cardona",
-  "homepage": "https://github.com/proyecto26/react-native-inappbrowser",
+  "homepage": "https://github.com/vandrei977/react-native-inappbrowser",
   "license": "MIT",
   "peerDependencies": {
     "react-native": ">=0.56"
@@ -52,9 +49,5 @@
     "flow-bin": "^0.183.1",
     "prettier": "^2.7.1",
     "react-native": "^0.69.3"
-  },
-  "collective": {
-    "type": "opencollective",
-    "url": "https://opencollective.com/proyecto26"
   }
 }

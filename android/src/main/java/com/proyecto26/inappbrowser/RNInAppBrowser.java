@@ -12,6 +12,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.Browser;
 import android.text.TextUtils;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -85,7 +86,8 @@ public class RNInAppBrowser {
     return _inAppBrowser;
   }
 
-  public Integer setColor(CustomTabsIntent.Builder builder, final ReadableMap options, String key, String method, String colorName) {
+  public Integer setColor(CustomTabsIntent.Builder builder, final ReadableMap options, String key, String method,
+      String colorName) {
     String colorString = null;
     Integer color = null;
     try {
@@ -98,7 +100,7 @@ public class RNInAppBrowser {
     } catch (Exception e) {
       if (e instanceof IllegalArgumentException) {
         throw new JSApplicationIllegalArgumentException(
-                "Invalid " + colorName + " color '" + colorString + "': " + e.getMessage());
+            "Invalid " + colorName + " color '" + colorString + "': " + e.getMessage());
       }
     } finally {
       return color;
@@ -122,105 +124,145 @@ public class RNInAppBrowser {
       mOpenBrowserPromise = null;
       return;
     }
+    CustomTabsCallback customTabsCallback = new CustomTabsCallback() {
+      int navigationEventCount = 0;
 
-    CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder();
-    isLightTheme = false;
-    final Integer toolbarColor = setColor(builder, options, KEY_TOOLBAR_COLOR, "setToolbarColor", "toolbar");
-    if (toolbarColor != null) {
-      isLightTheme = toolbarIsLight(toolbarColor);
-    }
-    setColor(builder, options, KEY_SECONDARY_TOOLBAR_COLOR, "setSecondaryToolbarColor", "secondary toolbar");
-    setColor(builder, options, KEY_NAVIGATION_BAR_COLOR, "setNavigationBarColor", "navigation bar");
-    setColor(builder, options, KEY_NAVIGATION_BAR_DIVIDER_COLOR, "setNavigationBarDividerColor", "navigation bar divider");
+      @Override
+      public void onNavigationEvent(int navigationEvent, Bundle extras) {
+        Log.i("zeitsprachen", "onNavigationEvent: " + navigationEvent);
+        if (navigationEvent == 1) {
+          navigationEventCount++;
+          if (navigationEventCount == 2) {
+            Log.i("zeitsprachen", "should now close browser");
+            close();
+          }
+        }
+      }
+    };
 
-    if (options.hasKey(KEY_DEFAULT_SHARE_MENU_ITEM) && 
-        options.getBoolean(KEY_DEFAULT_SHARE_MENU_ITEM)) {
-      builder.addDefaultShareMenuItem();
-    }
-    if (options.hasKey(KEY_ANIMATIONS)) {
-      final ReadableMap animations = options.getMap(KEY_ANIMATIONS);
-      applyAnimation(context, builder, animations);
-    }
-    if (options.hasKey(KEY_HAS_BACK_BUTTON) &&
-        options.getBoolean(KEY_HAS_BACK_BUTTON)) {
-      builder.setCloseButtonIcon(BitmapFactory.decodeResource(
-        context.getResources(),
-        isLightTheme ? R.drawable.ic_arrow_back_black : R.drawable.ic_arrow_back_white
-      ));
-    }
+    Context applicationContext = activity.getApplicationContext();
+    CustomTabsServiceConnection connection = new CustomTabsServiceConnection() {
+      @Override
+      public void onCustomTabsServiceConnected(@NonNull ComponentName name, @NonNull CustomTabsClient client) {
+        Log.i("zeitsprachen", "onCustomTabsServiceConnected");
+        customTabsClient = client;
 
-    CustomTabsIntent customTabsIntent = builder.build();
-    Intent intent = customTabsIntent.intent;
+        CustomTabsSession session = customTabsClient.newSession(customTabsCallback);
+        CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(session);
 
-    if (options.hasKey(KEY_HEADERS)) {
-      ReadableMap readableMap = options.getMap(KEY_HEADERS);
+        isLightTheme = false;
+        final Integer toolbarColor = setColor(builder, options, KEY_TOOLBAR_COLOR, "setToolbarColor", "toolbar");
+        if (toolbarColor != null) {
+          isLightTheme = toolbarIsLight(toolbarColor);
+        }
+        setColor(builder, options, KEY_SECONDARY_TOOLBAR_COLOR, "setSecondaryToolbarColor", "secondary toolbar");
+        setColor(builder, options, KEY_NAVIGATION_BAR_COLOR, "setNavigationBarColor", "navigation bar");
+        setColor(builder, options, KEY_NAVIGATION_BAR_DIVIDER_COLOR, "setNavigationBarDividerColor",
+            "navigation bar divider");
 
-      if (readableMap != null) {
-        ReadableMapKeySetIterator iterator = readableMap.keySetIterator();
-        if (iterator.hasNextKey()) {
-          Bundle headers = new Bundle();
-          while (iterator.hasNextKey()) {
-            String key = iterator.nextKey();
-            ReadableType readableType = readableMap.getType(key);
-            switch (readableType) {
-              case String:
-                headers.putString(key, readableMap.getString(key));
-                break;
-              default:
-                break;
+        if (options.hasKey(KEY_DEFAULT_SHARE_MENU_ITEM) &&
+            options.getBoolean(KEY_DEFAULT_SHARE_MENU_ITEM)) {
+          builder.addDefaultShareMenuItem();
+        }
+        if (options.hasKey(KEY_ANIMATIONS)) {
+          final ReadableMap animations = options.getMap(KEY_ANIMATIONS);
+          applyAnimation(context, builder, animations);
+        }
+        if (options.hasKey(KEY_HAS_BACK_BUTTON) &&
+            options.getBoolean(KEY_HAS_BACK_BUTTON)) {
+          builder.setCloseButtonIcon(BitmapFactory.decodeResource(
+              context.getResources(),
+              isLightTheme ? R.drawable.ic_arrow_back_black : R.drawable.ic_arrow_back_white));
+        }
+
+        CustomTabsIntent customTabsIntent = builder.build();
+        Intent intent = customTabsIntent.intent;
+
+        if (options.hasKey(KEY_HEADERS)) {
+          ReadableMap readableMap = options.getMap(KEY_HEADERS);
+
+          if (readableMap != null) {
+            ReadableMapKeySetIterator iterator = readableMap.keySetIterator();
+            if (iterator.hasNextKey()) {
+              Bundle headers = new Bundle();
+              while (iterator.hasNextKey()) {
+                String key = iterator.nextKey();
+                ReadableType readableType = readableMap.getType(key);
+                switch (readableType) {
+                  case String:
+                    headers.putString(key, readableMap.getString(key));
+                    break;
+                  default:
+                    break;
+                }
+              }
+              intent.putExtra(Browser.EXTRA_HEADERS, headers);
             }
           }
-          intent.putExtra(Browser.EXTRA_HEADERS, headers);
         }
-      }
-    }
 
-    if (options.hasKey(KEY_FORCE_CLOSE_ON_REDIRECTION) &&
-        options.getBoolean(KEY_FORCE_CLOSE_ON_REDIRECTION)) {
-      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-    }
-    if (!options.hasKey(KEY_SHOW_IN_RECENTS) ||
-        !options.getBoolean(KEY_SHOW_IN_RECENTS)) {
-      intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
-      intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
-    }
-
-    intent.putExtra(CustomTabsIntent.EXTRA_ENABLE_URLBAR_HIDING, (
-      options.hasKey(KEY_ENABLE_URL_BAR_HIDING) && 
-      options.getBoolean(KEY_ENABLE_URL_BAR_HIDING)));
-    try {
-      if (options.hasKey(KEY_BROWSER_PACKAGE)) {
-        final String packageName = options.getString(KEY_BROWSER_PACKAGE);
-        if (!TextUtils.isEmpty(packageName)) {
-          intent.setPackage(packageName);
+        if (options.hasKey(KEY_FORCE_CLOSE_ON_REDIRECTION) &&
+            options.getBoolean(KEY_FORCE_CLOSE_ON_REDIRECTION)) {
+          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
-      } else {
-        final String packageName = getDefaultBrowser(currentActivity);
-        intent.setPackage(packageName);
+        if (!options.hasKey(KEY_SHOW_IN_RECENTS) ||
+            !options.getBoolean(KEY_SHOW_IN_RECENTS)) {
+          intent.addFlags(Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS);
+          intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY);
+        }
+
+        intent.putExtra(CustomTabsIntent.EXTRA_ENABLE_URLBAR_HIDING, (options.hasKey(KEY_ENABLE_URL_BAR_HIDING) &&
+            options.getBoolean(KEY_ENABLE_URL_BAR_HIDING)));
+        try {
+          if (options.hasKey(KEY_BROWSER_PACKAGE)) {
+            final String packageName = options.getString(KEY_BROWSER_PACKAGE);
+            if (!TextUtils.isEmpty(packageName)) {
+              intent.setPackage(packageName);
+            }
+          } else {
+            final String packageName = getDefaultBrowser(currentActivity);
+            intent.setPackage(packageName);
+          }
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+
+        registerEventBus();
+
+        intent.setData(Uri.parse(url));
+        if (options.hasKey(KEY_SHOW_PAGE_TITLE)) {
+          builder.setShowTitle(options.getBoolean(KEY_SHOW_PAGE_TITLE));
+        } else {
+          intent.putExtra(CustomTabsIntent.EXTRA_TITLE_VISIBILITY_STATE, CustomTabsIntent.NO_TITLE);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && options.hasKey(KEY_INCLUDE_REFERRER)
+            && options.getBoolean(KEY_INCLUDE_REFERRER)) {
+          intent.putExtra(Intent.EXTRA_REFERRER,
+              Uri.parse("android-app://" + context.getApplicationContext().getPackageName()));
+        }
+
+        Log.i("zeitsprachen", "gets here");
+        applicationContext.unbindService(this);
+        currentActivity.startActivity(
+            ChromeTabsManagerActivity.createStartIntent(currentActivity, intent),
+            customTabsIntent.startAnimationBundle);
+
       }
-    } catch (Exception e) {
-      e.printStackTrace();
+
+      @Override
+      public void onServiceDisconnected(ComponentName name) {
+        customTabsClient = null;
+      }
+    };
+
+    final String packageName = getDefaultBrowser(context);
+    if (packageName != null) {
+      CustomTabsClient.bindCustomTabsService(context, packageName, connection);
+    } else {
+      System.err.println("No browser supported to bind custom tab service");
     }
 
-    registerEventBus();
-
-    intent.setData(Uri.parse(url));
-    if (options.hasKey(KEY_SHOW_PAGE_TITLE)) {
-      builder.setShowTitle(options.getBoolean(KEY_SHOW_PAGE_TITLE));
-    }
-    else {
-      intent.putExtra(CustomTabsIntent.EXTRA_TITLE_VISIBILITY_STATE, CustomTabsIntent.NO_TITLE);
-    }
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && options.hasKey(KEY_INCLUDE_REFERRER)
-        && options.getBoolean(KEY_INCLUDE_REFERRER)) {
-      intent.putExtra(Intent.EXTRA_REFERRER,
-          Uri.parse("android-app://" + context.getApplicationContext().getPackageName()));
-    }
-
-    currentActivity.startActivity(
-        ChromeTabsManagerActivity.createStartIntent(currentActivity, intent),
-        customTabsIntent.startAnimationBundle);
   }
 
   public void close() {
@@ -271,17 +313,17 @@ public class RNInAppBrowser {
 
   void applyAnimation(Context context, CustomTabsIntent.Builder builder, ReadableMap animations) {
     final int startEnterAnimationId = animations.hasKey(KEY_ANIMATION_START_ENTER)
-            ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_START_ENTER))
-            : -1;
+        ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_START_ENTER))
+        : -1;
     final int startExitAnimationId = animations.hasKey(KEY_ANIMATION_START_EXIT)
-            ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_START_EXIT))
-            : -1;
+        ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_START_EXIT))
+        : -1;
     final int endEnterAnimationId = animations.hasKey(KEY_ANIMATION_END_ENTER)
-            ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_END_ENTER))
-            : -1;
+        ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_END_ENTER))
+        : -1;
     final int endExitAnimationId = animations.hasKey(KEY_ANIMATION_END_EXIT)
-            ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_END_EXIT))
-            : -1;
+        ? resolveAnimationIdentifierIfNeeded(context, animations.getString(KEY_ANIMATION_END_EXIT))
+        : -1;
 
     if (startEnterAnimationId != -1 && startExitAnimationId != -1) {
       builder.setStartAnimations(context, startEnterAnimationId, startExitAnimationId);
@@ -325,8 +367,8 @@ public class RNInAppBrowser {
   private String getDefaultBrowser(Context context) {
     List<ResolveInfo> resolveInfos = getPreferredPackages(context);
     String packageName = CustomTabsClient.getPackageName(context,
-      Arrays.asList(CHROME_PACKAGE_STABLE, CHROME_PACKAGE_BETA, CHROME_PACKAGE_DEV, LOCAL_PACKAGE));
-    if(packageName == null && resolveInfos != null && resolveInfos.size() > 0){
+        Arrays.asList(CHROME_PACKAGE_STABLE, CHROME_PACKAGE_BETA, CHROME_PACKAGE_DEV, LOCAL_PACKAGE));
+    if (packageName == null && resolveInfos != null && resolveInfos.size() > 0) {
       packageName = resolveInfos.get(0).serviceInfo.packageName;
     }
     return packageName;
