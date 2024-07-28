@@ -3,21 +3,21 @@
  * @flow strict-local
  */
 
-import invariant from 'invariant';
+import invariant from "invariant";
 import {
   processColor,
   Linking,
   Platform,
   AppState,
   NativeModules,
-} from 'react-native';
+} from "react-native";
 import type {
   BrowserResult,
   RedirectEvent,
   RedirectResult,
   AuthSessionResult,
   InAppBrowserOptions,
-} from './types';
+} from "./types";
 
 export const RNInAppBrowser = NativeModules.RNInAppBrowser;
 
@@ -39,12 +39,12 @@ function waitForRedirectAsync(returnUrl: string): Promise<RedirectResult> {
   return new Promise(function (resolve) {
     _redirectHandler = (event: RedirectEvent) => {
       if (event.url && event.url.startsWith(returnUrl)) {
-        resolve({ url: event.url, type: 'success' });
+        resolve({ url: event.url, type: "success" });
       }
     };
 
     _linkingEventSubscription = Linking.addEventListener(
-      'url',
+      "url",
       _redirectHandler
     );
   });
@@ -63,21 +63,21 @@ function handleAppStateActiveOnce(): Promise<void> {
         return;
       }
 
-      if (nextAppState === 'active') {
+      if (nextAppState === "active") {
         if (
           appStateEventSubscription &&
           appStateEventSubscription.remove !== undefined
         ) {
           appStateEventSubscription.remove();
         } else {
-          AppState.removeEventListener('change', handleAppStateChange);
+          AppState.removeEventListener("change", handleAppStateChange);
         }
         resolve();
       }
     }
 
     appStateEventSubscription = AppState.addEventListener(
-      'change',
+      "change",
       handleAppStateChange
     );
   });
@@ -87,11 +87,13 @@ async function checkResultAndReturnUrl(
   returnUrl: string,
   result: AuthSessionResult
 ): Promise<AuthSessionResult> {
-  if (Platform.OS === 'android' && result.type !== 'cancel') {
+  if (Platform.OS === "android" && result.type !== "cancel") {
     try {
       await handleAppStateActiveOnce();
       const url = await Linking.getInitialURL();
-      return url && url.startsWith(returnUrl) ? { url, type: 'success' } : result;
+      return url && url.startsWith(returnUrl)
+        ? { url, type: "success" }
+        : result;
     } catch {
       return result;
     }
@@ -105,21 +107,34 @@ export async function openBrowserAsync(
   options?: InAppBrowserOptions = {
     animated: true,
     modalEnabled: true,
-    dismissButtonStyle: 'close',
+    dismissButtonStyle: "close",
     readerMode: false,
     enableBarCollapsing: false,
   }
 ): Promise<BrowserResult> {
-  return RNInAppBrowser.open({
-    ...options,
-    url,
-    preferredBarTintColor:
-      options.preferredBarTintColor &&
-      processColor(options.preferredBarTintColor),
-    preferredControlTintColor:
-      options.preferredControlTintColor &&
-      processColor(options.preferredControlTintColor),
-  });
+  if (Platform.OS === "android" && options.closeAfterLoad) {
+    return RNInAppBrowser.openWithClose({
+      ...options,
+      url,
+      preferredBarTintColor:
+        options.preferredBarTintColor &&
+        processColor(options.preferredBarTintColor),
+      preferredControlTintColor:
+        options.preferredControlTintColor &&
+        processColor(options.preferredControlTintColor),
+    });
+  } else {
+    return RNInAppBrowser.open({
+      ...options,
+      url,
+      preferredBarTintColor:
+        options.preferredBarTintColor &&
+        processColor(options.preferredBarTintColor),
+      preferredControlTintColor:
+        options.preferredControlTintColor &&
+        processColor(options.preferredControlTintColor),
+    });
+  }
 }
 
 export async function openAuthSessionAsync(
@@ -139,7 +154,7 @@ export async function openAuthSessionPolyfillAsync(
 ): Promise<AuthSessionResult> {
   invariant(
     !_redirectHandler,
-    'InAppBrowser.openAuth is in a bad state. _redirectHandler is defined when it should not be.'
+    "InAppBrowser.openAuth is in a bad state. _redirectHandler is defined when it should not be."
   );
   try {
     return await Promise.race([
@@ -163,7 +178,7 @@ export function closeAuthSessionPolyfillAsync(): void {
       _linkingEventSubscription.remove();
       _linkingEventSubscription = null;
     } else {
-      Linking.removeEventListener('url', _redirectHandler);
+      Linking.removeEventListener("url", _redirectHandler);
     }
     _redirectHandler = null;
   }
@@ -171,7 +186,7 @@ export function closeAuthSessionPolyfillAsync(): void {
 
 /* iOS <= 10 and Android polyfill for SFAuthenticationSession flow */
 export function authSessionIsNativelySupported(): boolean {
-  if (Platform.OS === 'android') {
+  if (Platform.OS === "android") {
     return false;
   }
 
@@ -179,4 +194,4 @@ export function authSessionIsNativelySupported(): boolean {
   return versionNumber >= 11;
 }
 
-export const isAndroid = Platform.OS === 'android';
+export const isAndroid = Platform.OS === "android";

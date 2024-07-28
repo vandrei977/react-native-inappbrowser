@@ -33,6 +33,13 @@ public class RNInAppBrowserModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
+  public void openWithClose(final ReadableMap options, final Promise promise) {
+    final Activity activity = getCurrentActivity();
+    RNInAppBrowser.getInstance().openWithClose(this.reactContext, options, promise, activity);
+  }
+
+
+  @ReactMethod
   public void close() {
     RNInAppBrowser.getInstance().close();
   }
